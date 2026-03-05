@@ -38,18 +38,18 @@ impl Langue {
     // FR: Libelle lisible affiche dans l interface.
     pub(crate) fn label(&self) -> &'static str {
         match self {
-            Langue::Francais => "FranÃ§ais",
+            Langue::Francais => "Français",
             Langue::Anglais => "English",
-            Langue::Espagnol => "EspaÃ±ol",
+            Langue::Espagnol => "Español",
             Langue::Italien => "Italiano",
             Langue::Allemand => "Deutsch",
-            Langue::Portugais => "PortuguÃªs",
-            Langue::Russe => "Ð ÑƒÑÑÐºÐ¸Ð¹",
-            Langue::Chinois => "ä¸­æ–‡",
-            Langue::Japonais => "æ—¥æœ¬èªž",
-            Langue::Coreen => "í•œêµ­ì–´",
-            Langue::Arabe => "Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©",
-            Langue::Hindi => "à¤¹à¤¿à¤¨à¥à¤¦à¥€",
+            Langue::Portugais => "Português",
+            Langue::Russe => "Русский",
+            Langue::Chinois => "中文",
+            Langue::Japonais => "日本語",
+            Langue::Coreen => "한국어",
+            Langue::Arabe => "العربية",
+            Langue::Hindi => "हिन्दी",
         }
     }
 }
