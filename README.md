@@ -41,11 +41,11 @@ It is compatible with Windows, macOS, and Linux.
   Gallery :
   <br>  <br>
 
+|                Space Invaders                 |
+| :------------------------------------------: |
+| ![Space Invaders](./images/SpaceInvaders.png) |
+
 
 |                    Tetris                    |                    Pong                    |
 | :------------------------------------------: | :----------------------------------------: |
 | ![Tetris](./images/Tetris.png) | ![Pong](./images/Pong.png) |
-
-|                Space Invaders                 |
-| :------------------------------------------: |
-| ![Space Invaders](./images/SpaceInvaders.png) |
