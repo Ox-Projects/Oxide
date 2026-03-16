@@ -14,8 +14,14 @@ It is compatible with Windows, macOS, and Linux.
   <a href="https://github.com/mewzers/Nova/releases"><img src="images/Linux.png" width="140"></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/mewzers/Nova/releases"><img src="images/Tahoe.png" width="150"></a>
+  <br>
+  <sub>Windows 11</sub>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <sub>Linux</sub>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <sub>macOS</sub>
   <br><br>
-  <img src="https://img.shields.io/github/downloads/mewzers/Nova/total" width="140">
+  <img src="https://img.shields.io/github/downloads/mewzers/Nova/total" width="160">
 </h1>
 
 
