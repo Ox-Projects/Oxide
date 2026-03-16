@@ -1,8 +1,5 @@
 
 <h1 align="center">
-  <br>
-  <a><img src="images/Chip8.png" width="220"></a>
-  <br>
   <b>Nova</b>
   <br>
 </h1>
