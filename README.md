@@ -2,7 +2,7 @@
 <h1 align="center">
   <b>Oxide - Chip8</b>
   <br>
-  <a href="https://github.com/OxideChip8/Oxide"><img src="images/Oxide.png" width="150"></a>
+  <a href="https://github.com/OxideChip8/Oxide"><img src="images/Oxide.png" width="290"></a>
   <br>
 </h1>
 
