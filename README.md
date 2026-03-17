@@ -33,9 +33,9 @@ It is compatible with Windows, macOS, and Linux.
   Gallery :
   <br>  <br>
 
-|                Space Invaders                 |
-| :------------------------------------------: |
-| ![Space Invaders](./images/SpaceInvaders.png) |
+|                Space Invaders                 |                   Snake                   |
+| :------------------------------------------:  |:----------------------------------------: |
+| ![Space Invaders](./images/SpaceInvaders.png) | ![Snake](./images/Snake.png) |
 
 
 |                    Tetris                    |                    Pong                    |
