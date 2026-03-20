@@ -138,4 +138,4 @@ All bindings are fully configurable in **Settings → Controls**.
 
 <h1 align="left">License :</h1>
 
-MIT
+[MIT](https://github.com/licences)
