@@ -17,8 +17,7 @@ Oxide is a modular CHIP-8 emulator written in Rust with an egui/eframe interface
 It is compatible with Windows, macOS, and Linux.
 
 
-### 🎯 Project Goal
-
+<h1 align="left">🎯 Project Goal :</h1>
 
 This project aims to learn and practice the Rust programming language through a concrete use case: building a CHIP-8 emulator.
 
