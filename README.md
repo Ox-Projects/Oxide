@@ -59,7 +59,7 @@ The goal is to provide a solid foundation for both mastering Rust and understand
 
 
 <h1 align="center">
-  <a href="https://github.com/OxideChip8/Oxide/releases/latest">
+  <a href="https://github.com/OxideChip8/Oxide/releases">
     <img src="https://img.shields.io/github/v/release/OxideChip8/Oxide" width="185">
   </a>
   <a href="https://github.com/OxideChip8/Oxide/releases/latest">
