@@ -19,7 +19,7 @@
     <img src="https://img.shields.io/github/v/release/OxideChip8/Oxide" width="185">
   </a>
   <a href="https://github.com/OxideChip8/Oxide/releases/latest">
-    <img src="https://img.shields.io/github/downloads/OxideChip8/Oxide/total?color=45E600" width="160">
+    <img src="https://img.shields.io/github/downloads/OxideChip8/Oxide/total?color=C0E600" width="160">
   </a>
   <img src="https://img.shields.io/badge/Rust-100%25-ff6758" width="145">
 </h1>
