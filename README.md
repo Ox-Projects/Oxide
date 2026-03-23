@@ -43,7 +43,7 @@ The goal is to provide a solid foundation for both mastering Rust and understand
 </h2>
 
 <h1 align="left"> Compatibility :
-
+<br>
 <p align="center">
  <a href="https://github.com/OxideChip8/Oxide/releases">
     <picture>
