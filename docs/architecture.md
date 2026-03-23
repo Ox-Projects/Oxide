@@ -8,23 +8,27 @@ flowchart TD
     %% Entry point
     Main[main.rs] --> App[app.rs]
 
-    %% App structure
-    App --> Init[Initialize app]
+    %% App lifecycle
+    App --> Init[Initialize application]
     App --> Loop[Main loop]
 
-    %% Core systems
+    %% Main loop flow
     Loop --> CPU[cpu.rs]
-    Loop --> Memory[memory.rs]
-    Loop --> Display[display.rs]
-    Loop --> Input[gamepad.rs / keypad.rs]
+    CPU --> Memory[memory.rs]
+    Memory --> Display[display.rs]
 
-    %% Additional systems
-    App --> Audio[audio.rs]
-    App --> UI[ui/]
-    App --> I18n[i18n.rs + json]
+    %% Input
+    Loop --> Input[gamepad.rs / keypad.rs]
+    Input --> CPU
+
+    %% Audio
+    Loop --> Audio[audio.rs]
+
+    %% UI
+    Loop --> UI[ui/ (top_bar, settings, etc.)]
+
+    %% Localization
+    App --> I18n[i18n.rs + JSON]
 
     %% Feedback loop
-    CPU --> Memory
-    Memory --> Display
-    Display --> Input
-    Input --> Loop
+    Display --> Loop
