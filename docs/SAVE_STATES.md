@@ -145,7 +145,7 @@ flowchart TD
 
 ---
 
-## Persistance des paramètres (eframe::Storage)
+## Parameter persistence (eframe::Storage)
 
 ```mermaid
 flowchart LR
@@ -167,18 +167,18 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Start([Démarrage]) --> Check{latest.logs\nexiste ?}
-    Check -- Oui --> Zip["Crée logs-app-&lt;timestamp&gt;.zip\ncontenant latest.logs"]
-    Zip --> Del["Supprime latest.logs"]
-    Del --> New["Ouvre nouveau latest.logs"]
+    Start([Start]) --> Check{latest.logs\nexiste ?}
+    Check -- yes --> Zip["Crée logs-app-&lt;timestamp&gt;.zip\ncontenant latest.logs"]
+    Zip --> Del["Delete latest.logs"]
+    Del --> New["Open new latest.logs"]
     Check -- Non --> New
-    New --> Session["Écriture des logs de session"]
+    New --> Session["Writing session logs"]
 ```
 
 ```
 logs/
 ├── app/
-│   ├── latest.logs              ← session en cours
+│   ├── latest.logs              ← current session
 │   └── logs-app-2025-01-01_...zip
 └── emulator/
     ├── latest.logs
