@@ -111,7 +111,7 @@ The goal is to provide a solid foundation for both mastering Rust and understand
 1. Download the latest release for your OS above
 2. Extract the zip
 3. Run `Oxide` (depending of the OS)
-4. Click **Game → Load game** and select a `.ch8` ROM file
+4. Click **Game → Load game** and select a `.ch8, .rom or .bin` ROM file
 
 <h1 align="left">Controls :</h1>
 
