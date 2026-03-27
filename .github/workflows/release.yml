@@ -76,4 +76,4 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ env.RELEASE_TAG }}" "target/release/Oxide.exe" "${{ env.BUNDLE_ZIP }}" --clobber
+        run: gh release upload "${{ env.RELEASE_TAG }}" "${{ env.BUNDLE_ZIP }}" --clobber
