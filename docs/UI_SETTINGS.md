@@ -1,183 +1,252 @@
-# Oxide — User Interface & Settings
+# Oxide - User Interface and Settings
 
-Documentation of the graphical user interface, windows, and parameter flow.
+This document describes the current user interface structure and the settings workflow.
 
----
+## Main application windows
 
-## Main Window Layout
+Oxide uses three main viewports:
 
-```mermaid
-block-beta
-    columns 1
-    TopBar["Menu Bar (30 px)\nGame | Emulator | Video | Controls | Shortcuts | Debug | Theme ☀/🌙/🌟"]
-Display["Central panel\nCHIP-8 display (64×32 × scale)\nPause/message overlay"]
-BottomBar["Status Bar (30 px)\nVersion | ROM | Status | CPU Hz | FPS | Volume"]
-```
+- main window
+- settings window
+- debug terminal window
 
----
+The main window is the root viewport.
+The settings window and debug terminal are detached secondary viewports managed by the app state.
 
-## Secondary windows (detached viewports)
+## Startup splash
 
-```mermaid
-graph LR
-Main["Main Window\n(root viewport)"]
+At launch, Oxide first shows a splash screen:
 
+- bundled logo
+- transparent/decorless splash viewport
+- animated logo pulse
+- version text overlay
 
-Settings["Settings\n(immediate viewport)\ncentered on the main window"]
-Terminal["Debug console\n(immediate viewport)\nto the right of the main window"]
+After the splash delay ends, the normal main UI takes over.
 
+## Main window layout
 
-Main -->|"window_settings = true"| Settings
-Main -->|"terminal_active = true"| Terminal
-Settings -->|"OK / Cancel / ✕"| Main
-Terminal -->|"✕ or checkbox"| Main
-```
+The main window is split into:
 
----
+- top bar
+- central display panel
+- bottom status bar
 
-## Settings tabs
+### Top bar
 
-```mermaid
-flowchart LR
-subgraph Tabs["Tabs"]
-T1["Emulator\nTheme, Language,\nCPU Hz"]
-T2["Video\nVSync, Scale"]
-T3["Audio, Volume"]
-T4["Controls\n16-key mapping\nCHIP-8"]
-T5["Shortcuts\nMapping 11 keyboard shortcuts"]
-T6["Debug\nTerminal, Quirks\nCHIP-8"]
-end
+The top bar currently exposes:
 
+- `Game`
+- `Emulator`
+- `Video`
+- `Controls`
+- `Shortcuts`
+- `Debug`
+- theme indicator / theme cycle button
 
-subgraph Actions["Footer buttons"]
-B1["OK → apply + close"]
-B2["Apply → apply"]
-B3["Default → Reset tab"]
-B4["Cancel → Restore Snapshot"]
-end
-```
+Examples of actions available from menus:
 
----
+- load game
+- load recent ROM
+- pause / resume
+- reset
+- stop
+- save state / load state
+- open settings tabs directly
+- change language
+- change render scale
+- toggle VSync / fullscreen
+- toggle debug terminal
 
-## Temporary data flow (settings)
+### Central display panel
 
-```mermaid
-stateDiagram-v2
-[*] --> Closed
+The main panel renders:
 
+- the CHIP-8 framebuffer
+- pause overlay
+- temporary status overlays/messages
 
-Closed --> Open: Open\n(snapshot of live values)
-Open --> Open: Modification\n(temp_* updated)
-Open --> Live: Apply / OK\napply_temp_values()
-Open --> Live: Cancel\nrestore_snapshots()
-Live --> Closed: Window closed
-Live --> [*] : save() au quit
+Display size depends on `video_scale` unless fullscreen/window constraints override it.
 
+### Bottom status bar
 
-note right of Open
-temp_theme, temp_langue,
-vsync_time, video_scale_time
-temp_touches, temp_raccourcis,
-temp_quirks, temp_son_active...
-end note
+The status bar summarizes runtime state such as:
 
-```
+- version
+- ROM information
+- running / paused state
+- CPU speed
+- FPS-related information
+- volume / sound state
 
----
+## Settings window
 
-## Key Bindings (Controls)
+The settings window is a detached viewport with tabbed sections.
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant UI as Controls Tab
-    participant App
+Current tabs:
 
-    User->>UI: Click on a CHIP-8 button
-    UI->>App: binding_key = Some(index)\nbinding_key_started = Instant::now()\nbinding_key_skip_first_click = true
-    UI->>UI: Displays "..." on the button
+- Emulator
+- Video
+- Audio
+- Controls
+- Shortcuts
+- Debug
 
-    alt Timeout 3 seconds
-        UI->>App: binding_key = None
-    else Keyboard key detected
-        UI->>App: temp_touches[index] = label
-        UI->>App: binding_key = None
-    else Mouse click detected (skip first)
-        UI->>App: temp_touches[index] = "MouseLeft/Right/..."
-        UI->>App: binding_key = None
-    end
-```
+### Footer actions
 
----
+The settings footer supports:
 
-## Keyboard Input Pipeline → CHIP-8
+- `OK`: apply and close
+- `Apply`: apply without closing
+- `Defaults`: reset the current tab to default values
+- `Cancel`: restore snapshots and close
 
-```mermaid
-flowchart TD
-    KB["Keyboard (egui InputState)\nkeys configured in temp_keys"]
-    Mouse["Mouse (egui PointerButton)\nbuttons configured in temp_touches"]
-    GP["Gamepad (gilrs)\npoll_chip8_keys()"]
-    Term["Debug terminal\nterminal_keypad_states[16]"]
+If settings differ from the live app state, a pending-changes message is shown.
 
-    OR["Logical OR\nstates[i] = keyboard || mouse || gamepad || terminal"]
+### Emulator tab
 
-    Keypad["Keypad.set_all(states)\n→ CPU.cycle() reads is_pressed()"]
+Contains items such as:
 
-    KB --> OR
-    Mouse --> OR
-    GP --> OR
-    Term --> OR
-    OR --> Keypad
-```
+- theme selection
+- language selection
+- CPU speed
+- full reset of all settings
 
----
+### Video tab
 
-## Available themes
+Contains:
 
-```mermaid
-flowchart LR
-    K["🌟 Kiwano\n(défaut)\nRouge bordeaux\négui custom visuals"]
-    D["🌙 Dark\négui::Visuals::dark()"]
-    L["☀ Light\négui::Visuals::light()"]
+- VSync toggle
+- render scale selection
 
-    K -->|"clic icône"| D
-    D -->|"clic icône"| L
-    L -->|"clic icône"| K
-```
+### Audio tab
 
----
+Contains:
 
-## Debug Console — Features
+- sound enabled toggle
+- volume slider
 
-```mermaid
-graph TD
-    subgraph Terminal["Oxide Console (separate viewport)"]
-        Logs["Log area\n(multiline TextEdit\nread-only)"]
-        Search["Search bar\n(line filter)"]
-        BtnReport["Test Report button\nemit_test_report()"]
-        BtnExport["Export Logs button\nrfd::FileDialog → .txt"]
-    end
+### Controls tab
 
-    subgraph Content["Log Content"]
-        Boot["Boot logs\n(seed_terminal_boot_logs)"]
-        Config["Config changes\n(log_config_changes)"]
-        Status["Status messages\n(update_terminal_log)"]
-        Report["F9 test report\nPC, logs, quirks..."]
-    end
+Contains the configurable CHIP-8 keypad mapping.
 
-    BtnReport --> Report
-    Boot --> Logs
-    Config --> Logs
-    Status --> Logs
-    Report --> Logs
-    Search --> |"filter"| Logs
-    BtnExport --> |"write file"| Disk[("Disk .txt")]
+Supported sources:
 
-    subgraph Files["Auto log files"]
-        AppLog["logs/app/latest.logs\n→ archived as .zip on startup"]
-        EmuLog["logs/emulator/latest.logs\n→ archived as .zip on startup"]
-    end
+- keyboard keys
+- mouse buttons
 
-    Logs --> AppLog
-    Status --> EmuLog
-```
+Binding flow:
+
+1. Click a key cell.
+2. Oxide waits for the next supported input.
+3. The binding is stored in temporary settings.
+4. The user applies or cancels through the normal settings flow.
+
+### Shortcuts tab
+
+Contains configurable global shortcuts such as:
+
+- load game
+- pause
+- reset
+- stop
+- fullscreen
+- save state slots
+- load state slots
+
+### Debug tab
+
+Contains:
+
+- debug terminal toggle
+- CPU quirk preset selection
+- individual quirk toggles
+
+## Temp/snapshot settings model
+
+The settings window does not mutate everything immediately.
+
+Instead, Oxide keeps:
+
+- live values
+- `temp_*` editable copies
+- `snapshot_*` rollback copies
+
+This enables correct `Apply`, `OK`, and `Cancel` behavior.
+
+## Debug terminal
+
+The debug terminal is a detached viewport rendered from `src/ui/debug_terminal.rs`.
+
+Current features:
+
+- live log display
+- search/filter field
+- export logs button
+- test report button
+- keyboard shortcut handling while focused
+- optional virtual keypad contribution to emulation input
+
+The terminal also follows the active application theme.
+
+## Input sources merged into emulation
+
+The CHIP-8 keypad state seen by the CPU is built from a merged view of:
+
+- keyboard input
+- mouse bindings
+- gamepad state
+- debug terminal keypad state
+
+This merge happens before CPU execution for the frame.
+
+## Themes
+
+Current themes:
+
+- `Kiwano`
+- `Dark`
+- `Light`
+
+### Kiwano
+
+Kiwano is the custom Oxide theme and the current default.
+
+It provides:
+
+- dark red / warm UI chrome
+- custom widget visuals
+- custom menu and popup styling
+- branded top-bar theme icon
+
+## Language system in the UI
+
+The UI supports 12 languages:
+
+- French
+- English
+- Spanish
+- Italian
+- German
+- Portuguese
+- Russian
+- Chinese
+- Japanese
+- Korean
+- Arabic
+- Hindi
+
+UI strings come from `src/i18n/common.json` plus language-specific JSON files.
+
+Debug strings use the separate `src/debug/i18n/` layer.
+
+## Window coordination details
+
+The app keeps detached windows coordinated with the main viewport:
+
+- settings can request focus when reopened
+- debug terminal can request focus when toggled on
+- main window tracks fullscreen/maximized state
+- viewport sizes are updated according to current UI state
+
+This coordination is handled centrally from `app.rs`.

@@ -1,142 +1,148 @@
+# Oxide
 
-<h1 align="center">
-  <b>Oxide</b>
-  <br>
-  <sub>A modern CHIP-8 emulator written in Rust</sub>
-  <br>
-  <a href="https://github.com/OxideChip8/Oxide">
-    <picture>
-      <source srcset="images/svg/Oxide.svg" type="image/svg+xml">
-      <img src="images/png/Oxide.png" width="290">
-    </picture>
-  </a>
-  <br>
-  
-  <a href="https://github.com/OxideChip8/Oxide/milestones">
-    <img src="https://img.shields.io/badge/Current progress-%25-fffeb5" width="222">
-  </a>
-  <a href="https://github.com/OxideChip8/Oxide/releases">
-    <img src="https://img.shields.io/github/v/release/OxideChip8/Oxide?color=FFD200" width="185">
-  </a>
-  <a href="https://github.com/OxideChip8/Oxide/releases/latest">
-    <img src="https://img.shields.io/github/downloads/OxideChip8/Oxide/total?color=C0E600" width="160">
-  </a>
-  <img src="https://img.shields.io/badge/Rust-100%25-ff6758" width="145">
-</h1>
+A modern CHIP-8 emulator written in Rust with an `egui` / `eframe` interface.
 
-### Oxide is a modular CHIP-8 emulator written in Rust with an egui/eframe interface, multilingual support, debugging tools, and configurable input/video/audio settings.
-### It is compatible with Windows, macOS, and Linux.
+Oxide focuses on a clean desktop UI, configurable emulation behavior, multilingual support, save states, debug tooling, and a polished startup experience.
 
+## Highlights
 
-<h1 align="left">🎯 Project Goal :</h1>
+- Full CHIP-8 CPU implementation with configurable compatibility quirks
+- Animated splash screen with bundled logo and version display
+- Three application themes: Kiwano, Dark, Light
+- 12 UI languages: FR, EN, ES, IT, DE, PT, RU, ZH, JA, KO, AR, HI
+- Save/load states with per-ROM slots and metadata
+- Debug terminal with live logs, search, export, and test reports
+- Keyboard, mouse, and gamepad input support
+- Audio buzzer with volume control
+- Detached Settings and Debug Terminal windows
+- Windows single-instance protection
 
-This project aims to learn and practice the Rust programming language through a concrete use case: building a CHIP-8 emulator.
+## Platform support
 
-It helps to understand key Rust concepts (memory management, structs, ownership, etc.) while also introducing the fundamentals of emulator development, such as the instruction cycle, input/output handling, and graphics rendering.
+Oxide is designed to run on:
 
-Beyond simply recreating a basic emulator, the objective is also to design a modern CHIP-8 emulator that includes features and interfaces inspired by contemporary emulators. This may include a user-friendly interface, debugging tools, configurable controls, save states, and performance optimizations.
+- Windows
+- Linux
+- macOS
 
-The goal is to provide a solid foundation for both mastering Rust and understanding how emulators work, making it easier to build similar projects for other systems in the future.
-<h2>
-  To view the project roadmap :
-  <a href="https://github.com/OxideChip8/Oxide/blob/main/ROADMAP.md">ROADMAP.md</a>
-</h2>
+Windows currently has the most platform-specific integration, including the app icon resource and single-instance guard.
 
-<h1 align="left"> Compatibility :
-<br>
-<p align="center">
- <a href="https://github.com/OxideChip8/Oxide/releases">
-    <picture>
-      <source srcset="images/svg/W11.svg" type="image/svg+xml">
-      <img src="images/png/W11.png" width="150">
-    </picture>
-  </a>
-  
-  <a href="https://github.com/OxideChip8/Oxide/releases">
-    <picture>
-      <source srcset="images/svg/Linux.svg" type="image/svg+xml">
-      <img src="images/png/Linux.png" width="140">
-    </picture>
-  </a>
-  
-  <a href="https://github.com/OxideChip8/Oxide/releases">
-    <picture>
-      <source srcset="images/svg/Tahoe.svg" type="image/svg+xml">
-      <img src="images/png/Tahoe.png" width="150">
-    </picture>
-  </a>
-  <br>
-  
-  <p align="center"><b>Windows 11, Linux and macOS</b></p>
-  </p>
-</h1>
+## Getting started
 
+### Run from source
 
-<h1 align="left">
-  Emulator :
-  <br><br>
-    
-  <p align="center">
-      <picture>
-      <source srcset="images/svg/Window.svg" type="image/svg+xml">
-      <img src="images/png/Window.png" width="900">
-  </picture>
-  </p>
-  
-<h1 align="left">
-  Gallery :
-  <br><br>
+```bash
+cargo run
+```
 
+### Build a release binary
 
-|                Space Invaders                 |                   Snake                   |
-| :------------------------------------------:  |:----------------------------------------: |
-| <picture><source srcset="./images/svg/SpaceInvaders.svg" type="image/svg+xml"><img src="./images/png/SpaceInvaders.png"></picture> | <picture><source srcset="./images/svg/Snake.svg" type="image/svg+xml"><img src="./images/png/Snake.png"></picture> 
+```bash
+cargo build --release
+```
 
-|                    Tetris                    |                    Pong                    |
-| :------------------------------------------: | :----------------------------------------: |
-| <picture><source srcset="./images/svg/Tetris.svg" type="image/svg+xml"><img src="./images/png/Tetris.png"></picture> | <picture><source srcset="./images/svg/Pong.svg" type="image/svg+xml"><img src="./images/png/Pong.png"></picture> |
+### Load a ROM
 
+From the UI:
 
-<h1 align="left">Features :</h1>
+`Game -> Load game`
 
-- 🎮 Full CHIP-8 CPU (35 opcodes) with configurable quirks (CHIP-8, CHIP-48, SUPER-CHIP)
-- 🖥️ 64×32 pixel display with 1x–5x scaling
-- 🔊 Audio buzzer with volume control
-- 🕹️ Keyboard, mouse and gamepad support (gilrs)
-- 💾 Save/Load states (3 slots per ROM)
-- 🌍 12 languages (EN, FR, ES, IT, DE, PT, RU, ZH, JA, KO, AR, HI)
-- 🔧 Configurable controls and keyboard shortcuts
-- 🖥️ Debug terminal with search, export and live diagnostics
-- 🪟 Windows single-instance protection
+Supported ROM extensions:
 
-<h1 align="left">Getting Started :</h1>
+- `.ch8`
+- `.rom`
+- `.bin`
 
-1. Download the latest release for your OS above
-2. Extract the zip
-3. Run `Oxide` (depending of the OS)
-4. Click **Game → Load game** and select a `.ch8, .rom or .bin` file
+## Main features
 
-<h1 align="left">Controls :</h1>
+### Emulation
 
-The CHIP-8 uses a 16-key hexadecimal keypad mapped to your keyboard by default :
+- 35 CHIP-8 opcodes implemented
+- 64x32 framebuffer rendering
+- Adjustable video scale from `1x` to `5x`
+- VSync toggle and fullscreen support
+- Quirk presets: CHIP-8, CHIP-48, SUPER-CHIP, Custom
 
+### Input
 
-| 1 | 2 | 3 | C |
-|:------:|:---:|:---:|:---:|
-| 4 | 5 | 6 | D |
-| 7 | 8 | 9 | E |
-| A | 0 | B | F |
+- Fully configurable 16-key CHIP-8 mapping
+- Configurable keyboard shortcuts
+- Mouse button bindings supported in control mapping
+- Gamepad polling through `gilrs`
 
-All bindings are fully configurable in **Settings → Controls**.
+### Audio
 
-<h1 align="left">Built With :</h1>
+- CHIP-8 buzzer driven by `rodio`
+- Volume control from `0` to `100`
+- Runtime enable/disable toggle
+
+### Save states
+
+- 3 slots per ROM
+- Save/load from menu, settings, or shortcuts
+- Metadata saved with timestamp and ROM identity
+- `.state` files stored under `savestates/`
+
+### Debugging
+
+- Detached debug terminal window
+- Runtime logs with search filter
+- Export logs to text file
+- On-demand test report with CPU/video/quirk snapshot
+- Rotating `logs/app` and `logs/emulator` archives
+
+### UI and UX
+
+- Startup splash screen
+- Settings window with tabbed configuration flow
+- Theme switching from top bar and settings
+- Pending-change detection in settings
+- Status bar with runtime information
+
+## Default shortcuts
+
+The exact shortcuts are configurable in the UI. Default bindings are defined in `src/types.rs`.
+
+Common defaults:
+
+- `O`: load game
+- `P`: pause / resume
+- `R`: reset ROM
+- `Esc`: stop emulation
+- `F11`: fullscreen
+- `F1-F3`: save state slots 1-3
+- `F5-F7`: load state slots 1-3
+
+## Project documentation
+
+- [ROADMAP.md](ROADMAP.md)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/CPU_EMULATION.md](docs/CPU_EMULATION.md)
+- [docs/SAVE_STATES.md](docs/SAVE_STATES.md)
+- [docs/UI_SETTINGS.md](docs/UI_SETTINGS.md)
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- [docs/DEBUG_LOGGING.md](docs/DEBUG_LOGGING.md)
+
+## Repository assets
+
+Project visuals are stored under:
+
+- `images/`
+- `src/assets/icons/`
+- `src/assets/logo/`
+- `src/assets/fonts/`
+
+## Built with
 
 - [Rust](https://www.rust-lang.org/)
 - [egui / eframe](https://github.com/emilk/egui)
 - [rodio](https://github.com/RustAudio/rodio)
 - [gilrs](https://gitlab.com/gilrs-project/gilrs)
 - [rfd](https://github.com/PolyMeilex/rfd)
+- [image](https://crates.io/crates/image)
+- [zip](https://crates.io/crates/zip)
+- [chrono](https://crates.io/crates/chrono)
 
-<h1 align="left">License :</h1>
+## License
 
-[MIT](https://github.com/OxideChip8/Oxide?tab=MIT-1-ov-file)
+[MIT](LICENSE)

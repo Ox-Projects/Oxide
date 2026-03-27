@@ -1,289 +1,198 @@
-# Oxide — Architecture
+# Oxide - Architecture
 
-Oxide is a CHIP-8 emulator written in Rust, built on top of [egui](https://github.com/emilk/egui) / [eframe](https://github.com/emilk/eframe_template). This document describes the crate layout, module responsibilities, and the key data flows at runtime.
+This document describes the current crate layout, the main runtime data structures, and the high-level execution flow of Oxide.
 
----
+## High-level layout
 
-## Module Map
+Main modules:
 
-```mermaid
-graph TD
-    main["main.rs\n(entry point)"]
-    app["app.rs\nOxide struct\n(app state + eframe::App)"]
-    cpu["cpu.rs\nCPU struct\n(fetch / decode / execute)"]
-    display["display.rs\nDisplay struct\n(64×32 framebuffer)"]
-    keypad["keypad.rs\nKeypad struct\n(16-key state)"]
-    memory["memory.rs\n(constants, fontset)"]
-    audio["audio.rs\nAudioEngine\n(rodio buzzer)"]
-    gamepad["gamepad.rs\n(gilrs controller polling)"]
-    fonts["fonts.rs\n(egui font setup)"]
-    i18n["i18n.rs\n(UI translations)"]
-    debug["debug.rs\n(dev logging)"]
-    types["types.rs\n(enums & config types)"]
-    utils["utils.rs\n(helpers: key mapping, window size)"]
-    constants["constants.rs\n(VERSION, pixel sizes)"]
+- `src/main.rs`: process entry point, window/bootstrap setup, splash initialization, Windows single-instance guard
+- `src/app.rs`: `Oxide` application state, `eframe::App` implementation, runtime orchestration
+- `src/cpu.rs`: CHIP-8 fetch/decode/execute loop and quirk-aware opcode behavior
+- `src/display.rs`: 64x32 framebuffer state and pixel operations
+- `src/keypad.rs`: CHIP-8 keypad state abstraction
+- `src/audio.rs`: buzzer backend driven by `rodio`
+- `src/gamepad.rs`: gamepad polling integration through `gilrs`
+- `src/i18n.rs`: UI translations and shared translation loading
+- `src/debug.rs`: low-level debug logging
+- `src/debug/i18n.rs`: debug-string localization layer
+- `src/types.rs`: enums and persistent configuration models
+- `src/utils.rs`: mapping helpers, shortcuts, input translation helpers
+- `src/constants.rs`: version string and UI/display constants
+- `src/ui/`: top bar, bottom bar, main panel, settings window, debug terminal
 
-    ui["ui/"]
-    top_bar["ui/top_bar.rs"]
-    bottom_bar["ui/bottom_bar.rs"]
-    main_panel["ui/main_panel.rs"]
-    settings["ui/settings.rs"]
-    terminal["ui/debug_terminal.rs"]
+## Core runtime objects
 
-    main --> app
-    main --> fonts
-    app --> cpu
-    app --> display
-    app --> keypad
-    app --> audio
-    app --> gamepad
-    app --> i18n
-    app --> debug
-    app --> types
-    app --> utils
-    app --> constants
-    app --> ui
-    cpu --> memory
-    cpu --> display
-    cpu --> keypad
-    ui --> top_bar
-    ui --> bottom_bar
-    ui --> main_panel
-    ui --> settings
-    ui --> terminal
-    top_bar --> app
-    bottom_bar --> app
-    main_panel --> app
-    settings --> app
-    terminal --> app
-```
+### `Oxide`
 
----
+`Oxide` is the root application state.
 
-## Core Data Structures
+It contains:
 
-```mermaid
-classDiagram
-    class Oxide {
-        +CPU cpu
-        +Display display
-        +Keypad keypad
-        +AudioEngine audio_engine
-        +CpuQuirks quirks
-        +AppTheme theme
-        +Langue langue
-        +u8 video_scale
-        +bool vsync
-        +bool fullscreen
-        +bool en_pause
-        +bool rom_chargee
-        +Vec~u8~ rom_data
-        +Option~EmuSnapshot~[3] savestates
-        +update()
-        +save()
-        +load_rom_path()
-        +reset_rom()
-        +stop_emulation()
-        +toggle_pause()
-        +save_state_slot_manual()
-        +load_state_slot()
-    }
+- emulation state: `cpu`, `display`, `keypad`, `rom_data`, `rom_path`
+- presentation state: `theme`, `langue`, `video_scale`, `fullscreen`, `vsync`
+- settings temp/snapshot state for deferred apply/cancel flows
+- runtime flags for detached windows, focus handling, overlays, splash, cursor visibility
+- debug terminal buffers and file handles
+- save-state metadata and snapshots
+- audio backend instance
 
-    class CPU {
-        +u8[16] v
-        +u16 i
-        +u16 pc
-        +u8 sp
-        +u16[16] stack
-        +u8 delay_timer
-        +u8 sound_timer
-        +u8[4096] memory
-        +cycle()
-        +tick_timers()
-        +load_program()
-        +hard_reset()
-    }
+`Oxide` also owns the frame loop through `impl eframe::App`.
 
-    class Display {
-        +Vec~u8~ pixels
-        +clear()
-        +get_pixel()
-        +set_pixel()
-    }
+### `CPU`
 
-    class Keypad {
-        +bool[16] keys
-        +is_pressed()
-        +first_pressed()
-        +set_all()
-    }
+The CPU struct contains the CHIP-8 machine state:
 
-    class AudioEngine {
-        +set_buzzer()
-        +stop()
-    }
+- `v[16]`
+- `i`
+- `pc`
+- `sp`
+- `stack[16]`
+- `delay_timer`
+- `sound_timer`
+- `memory[4096]`
 
-    class EmuSnapshot {
-        +CPU cpu
-        +Display display
-        +Vec~u8~ memory
-    }
+Execution is quirk-aware via `CpuQuirks`.
 
-    class CpuQuirks {
-        +bool shift_uses_vy
-        +bool jump_uses_vx
-        +bool draw_clips
-        +bool load_store_increment_i
-        +bool logic_clears_vf
-    }
+### `Display`
 
-    Oxide --> CPU
-    Oxide --> Display
-    Oxide --> Keypad
-    Oxide --> AudioEngine
-    Oxide --> CpuQuirks
-    Oxide --> EmuSnapshot
-    EmuSnapshot --> CPU
-    EmuSnapshot --> Display
-```
+`Display` stores the logical framebuffer used by the main panel.
 
----
+- logical size: `64 x 32`
+- pixel storage: flat vector of on/off values
+- helpers: clear, read, and write pixels
 
-## Frame Update Loop
+### `AudioEngine`
 
-Every frame, `eframe` calls `Oxide::update()`. The sequence is:
+`AudioEngine` is a minimal lazy backend:
 
-```mermaid
-sequenceDiagram
-    participant eframe
-    participant Oxide
-    participant CPU
-    participant Display
-    participant Keypad
-    participant AudioEngine
+- opens a default output stream only when needed
+- plays a continuous `880 Hz` sine wave while the CHIP-8 sound timer is active
+- maps UI volume `0..100` to a reduced output gain
 
-    eframe->>Oxide: update(ctx, frame)
-    alt Splash active
-        Oxide->>Oxide: render splash screen
-        Oxide-->>eframe: return early
-    end
-    Oxide->>Oxide: handle pending file open
-    Oxide->>Oxide: sync viewport / fullscreen state
-    Oxide->>Oxide: handle_shortcuts(ctx)
-    Oxide->>Keypad: update_keypad_from_input(ctx)
-    Oxide->>Oxide: run_emulator_step(dt)
-    loop CPU cycles (up to 2000/frame)
-        Oxide->>CPU: cycle(display, keypad, quirks)
-        CPU->>Display: set_pixel / clear
-        CPU->>Keypad: is_pressed / first_pressed
-    end
-    loop 60 Hz timer ticks
-        Oxide->>CPU: tick_timers()
-    end
-    CPU-->>AudioEngine: sound_timer > 0 → set_buzzer(true)
-    Oxide->>Oxide: seed_terminal_boot_logs()
-    Oxide->>Oxide: log_config_changes()
-    Oxide->>Oxide: update_terminal_log()
-    Oxide->>eframe: render top_bar, bottom_bar, main_panel
-    alt Settings open
-        Oxide->>eframe: render settings viewport
-    end
-    alt Terminal open
-        Oxide->>eframe: render debug_terminal viewport
-    end
-```
+## Startup flow
 
----
+`main.rs` currently does the following:
 
-## CPU Instruction Cycle
+1. On Windows, acquire a named mutex to prevent multiple instances.
+2. Log early startup debug messages.
+3. Build a compact splash viewport using the bundled logo size.
+4. Load the main window icon from bundled `.ico` assets.
+5. Start `eframe::run_native` with the splash viewport.
+6. Re-arm splash state even when persistent settings were restored.
+7. Reset ROM/runtime state while preserving persisted settings.
+8. Hand control to `Oxide::update()`.
 
-```mermaid
-flowchart TD
-    A([Start cycle]) --> B[fetch: read 2 bytes at PC\nPC += 2]
-    B --> C[decode: split nibbles n1 n2 n3 n4]
-    C --> D{n1?}
-    D -- 0x0 --> E[CLS / RET]
-    D -- 0x1 --> F[JP addr]
-    D -- 0x2 --> G[CALL addr]
-    D -- 0x3-5-9 --> H[Skip conditionals]
-    D -- 0x6-7 --> I[LD / ADD Vx byte]
-    D -- 0x8 --> J[ALU ops 0-7 E]
-    D -- 0xA --> K[LD I addr]
-    D -- 0xB --> L[JP V0+addr]
-    D -- 0xC --> M[RND Vx byte]
-    D -- 0xD --> N[DRW Vx Vy n\nXOR pixels\nset VF collision]
-    D -- 0xE --> O[SKP / SKNP key]
-    D -- 0xF --> P[Timers / BCD\nLoad-Store / Font]
-    N --> Q[Display::set_pixel]
-    J --> R{quirks?}
-    R -- shift_uses_vy --> S[source = Vy]
-    R -- default --> T[source = Vx]
-```
+## Frame loop
 
----
+Every frame, `Oxide::update()` drives the app in this rough order:
 
-## Save State Flow
+1. Render splash screen and early-return while splash is active.
+2. Handle pending file open requests (`.state`, `.ch8`, `.rom`, `.bin`).
+3. Synchronize window metrics, fullscreen state, and focus state.
+4. Resize the main viewport when needed according to `video_scale`.
+5. Process global shortcuts.
+6. Update keypad state from keyboard, mouse, gamepad, and debug terminal input.
+7. Advance emulation based on `stable_dt`.
+8. Tick timers and drive the audio engine.
+9. Seed debug terminal boot logs once.
+10. Log runtime configuration changes.
+11. Apply theme visuals.
+12. Render top bar, bottom bar, display panel, settings window, and debug terminal.
+13. Repaint continuously while emulation is active or overlays are visible.
 
-```mermaid
-flowchart LR
-    subgraph Save
-        A([User triggers save\nslot N]) --> B{Slot already\noccupied?}
-        B -- Yes manual --> C[Show confirm dialog]
-        C -- Confirmed --> D[save_state_slot_commit]
-        B -- No or shortcut --> D
-        D --> E[Clone CPU + Display + memory\ninto EmuSnapshot]
-        E --> F[Write PersistedSaveState\nto savestates/rom-id/slot-N-timestamp.state]
-    end
+## Detached windows
 
-    subgraph Load
-        G([User triggers load\nslot N]) --> H{Snapshot\nexists?}
-        H -- No --> I[Show empty slot message]
-        H -- Yes --> J[Restore CPU + Display + memory\nfrom EmuSnapshot]
-        J --> K[Reset accumulators\nResume emulation]
-    end
-```
+Oxide uses multiple viewports:
 
----
+- main window: root application viewport
+- settings window: detached configuration viewport
+- debug terminal: detached logging/diagnostics viewport
 
-## I18n System
+Both detached windows are coordinated from `app.rs` and rendered in `src/ui/settings.rs` and `src/ui/debug_terminal.rs`.
 
-```mermaid
-flowchart TD
-    A[common.json\nshared keys] --> C[parse_translation]
-    B[lang/XX.json\ne.g. fr.json] --> C
-    C --> D{Valid JSON?}
-    D -- Yes --> E[Translations struct\ncached in static Lazy]
-    D -- No --> F[Fallback to en.json]
-    F --> E
-    E --> G[tr - langue - returns static Translations]
-    G --> H[UI strings used in\ntop_bar settings terminal]
-```
+## Settings architecture
 
----
+The settings system uses a deferred-apply model.
 
-## Quirks Presets
+Persistent live values:
 
-| Quirk | CHIP-8 | CHIP-48 | SUPER-CHIP |
-|---|---|---|---|
-| `shift_uses_vy` | ❌ | ✅ | ✅ |
-| `jump_uses_vx` | ❌ | ✅ | ✅ |
-| `draw_clips` | ❌ | ❌ | ✅ |
-| `load_store_increment_i` | ❌ | ❌ | ❌ |
-| `logic_clears_vf` | ❌ | ❌ | ❌ |
+- `theme`
+- `langue`
+- `vsync`
+- `video_scale`
+- `touches`
+- `raccourcis`
+- `cycles_par_seconde`
+- `son_active`
+- `sound_volume`
+- `quirks`
+- `quirks_preset`
+- `terminal_active`
 
----
+Temporary editing values:
 
-## Persistence Strategy
+- `temp_*`
 
-`eframe` serializes the `Oxide` struct via `serde` on exit. Fields tagged `#[serde(skip)]` are **not** persisted (runtime-only handles, textures, log buffers). On startup the saved JSON is deserialized and runtime fields are re-initialized.
+Rollback snapshot values:
 
-Save states are stored separately as JSON files under `savestates/<rom_name>-<fnv1a_hash>/`.
+- `snapshot_*`
 
-```mermaid
-flowchart LR
-    A[eframe storage\napp_key JSON] -- load --> B[Oxide struct\nsettings only]
-    C[savestates/\nrom-id/slot-N.state] -- load_savestates_for_rom --> D[EmuSnapshot\nin memory]
-    B --> E[reset_runtime_on_startup]
-    E --> F[Ready to run]
-    D --> F
-```
+This allows:
+
+- `Apply`: commit temp values without closing
+- `OK`: commit and close
+- `Cancel`: restore snapshots
+- `Defaults`: reset current tab temp values
+- `Reset all`: restore all defaults
+
+## Save-state architecture
+
+Save states are stored separately from UI persistence.
+
+Persistent user settings use `eframe::Storage`, while save states are written as `.state` files on disk.
+
+Important save-state types:
+
+- `EmuSnapshot`
+- `SaveStateMeta`
+- `PersistedSaveState`
+
+Save states are organized per ROM using a sanitized ROM name plus a stable FNV-1a hash.
+
+## Localization architecture
+
+UI translations are loaded from:
+
+- `src/i18n/common.json`
+- `src/i18n/<lang>.json`
+
+Debug translations are loaded from:
+
+- `src/debug/i18n/common.json`
+- `src/debug/i18n/<lang>.json`
+
+The `common.json` layer stores identical strings shared by all languages to reduce duplication.
+
+## Logging architecture
+
+There are two log layers:
+
+- console/debug lifecycle logs via `src/debug.rs`
+- in-app debug terminal logs managed by `Oxide`
+
+Rotating on-disk log folders:
+
+- `logs/app`
+- `logs/emulator`
+
+Previous `latest.logs` files are zipped on startup before the new session begins.
+
+## Current design priorities
+
+The codebase is currently structured around these goals:
+
+- keeping emulation logic separated from UI rendering
+- supporting configurable UX without losing deterministic CPU behavior
+- preserving user settings while clearing runtime-only state at startup
+- providing practical diagnostics for emulator development and ROM testing

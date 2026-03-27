@@ -1,186 +1,174 @@
-# Oxide — Save States & Persistance
+# Oxide - Save States and Persistence
 
-Documentation du système de sauvegarde d'états et de persistance des données.
+This document describes how Oxide persists user configuration, save states, and runtime logs.
 
----
+## Two persistence layers
 
-## Vue d'ensemble
+Oxide currently uses two distinct persistence mechanisms:
 
-Oxide dispose de deux systèmes de persistance distincts :
+1. UI/application settings via `eframe::Storage`
+2. ROM-specific save states via `.state` files under `savestates/`
 
-1. **Paramètres utilisateur** — via `eframe::Storage` (JSON interne eframe)
-2. **Save states** — fichiers `.state` par ROM, dans le dossier `savestates/`
+These two layers are intentionally separate.
 
----
+## Persisted application settings
 
-## Structure des données d'un save state
+`Oxide::save()` stores user-facing configuration while stripping runtime-only state.
 
-```mermaid
-classDiagram
-    class PersistedSaveState {
-        +version : u32
-        +rom_name : String
-        +rom_hash : String
-        +rom_bytes : Vec~u8~
-        +rom_path : String
-        +slot : usize
-        +meta : SaveStateMeta
-        +snapshot : EmuSnapshot
-    }
+Persisted examples:
 
-    class SaveStateMeta {
-        +name : String
-        +timestamp : String
-    }
+- theme
+- language
+- VSync
+- video scale
+- controls
+- shortcuts
+- CPU speed
+- sound enabled / volume
+- quirks and quirk preset
+- debug terminal enabled state
+- last ROM path
 
-    class EmuSnapshot {
-        +cpu : CPU
-        +display : Display
-        +memory : Vec~u8~
-    }
+Runtime-only fields are explicitly reset before serialization, including:
 
-    PersistedSaveState --> SaveStateMeta
-    PersistedSaveState --> EmuSnapshot
-    EmuSnapshot --> CPU
-    EmuSnapshot --> Display
-```
+- live CPU state
+- live display state
+- keypad state
+- ROM bytes/path currently in memory
+- terminal logs
+- focus flags
+- splash runtime data
+- transient overlay state
+- save-state cache arrays
 
----
+This is why the app can restore preferences without booting into a stale emulation session.
 
-## Organisation des fichiers sur disque
+## Save-state data model
 
-```
+Current save-state structures:
+
+- `EmuSnapshot`
+- `SaveStateMeta`
+- `PersistedSaveState`
+
+`PersistedSaveState` contains:
+
+- save-state format version
+- ROM name
+- ROM hash
+- ROM bytes
+- ROM path
+- slot index
+- human-readable metadata
+- emulation snapshot payload
+
+## Slot model
+
+Oxide exposes 3 save slots per ROM.
+
+Slots are available from:
+
+- top bar menus
+- keyboard shortcuts
+- debug terminal shortcuts
+- explicit `.state` file loading
+
+Manual save on an occupied slot can trigger an overwrite confirmation dialog.
+
+## ROM identity and save directory layout
+
+Save-state folders are generated from:
+
+- sanitized ROM name
+- stable FNV-1a 64-bit hash of ROM bytes
+
+Typical layout:
+
+```text
 savestates/
-└── <nom_rom>-<hash_fnv1a>/          ← un dossier par ROM
-    ├── <nom>_01_<timestamp>.state   ← slot 1
-    ├── <nom>_02_<timestamp>.state   ← slot 2
-    └── <nom>_03_<timestamp>.state   ← slot 3
+└── <rom-name>-<rom-hash>/
+    ├── <rom-name>_01_<timestamp>.state
+    ├── <rom-name>_02_<timestamp>.state
+    └── <rom-name>_03_<timestamp>.state
 ```
 
-> Un seul fichier `.state` par slot est conservé. L'ancien est supprimé avant chaque écriture.
+Only one current file per slot is retained; older slot files are replaced.
 
----
+## Save flow
 
-## Identification des ROMs
+When saving a slot:
 
-```mermaid
-flowchart LR
-    ROM["Données ROM (octets)"]
-    FNV["FNV-1a 64-bit\nrom_hash_hex()"]
-    Name["Nom de fichier\nsanitize_filename()"]
-    Dir["savestates/\n&lt;nom&gt;-&lt;hash&gt;/"]
+1. The app verifies that a ROM is loaded.
+2. CPU, display, and memory state are cloned into `EmuSnapshot`.
+3. Slot metadata is created with timestamp and ROM-derived display name.
+4. A `PersistedSaveState` value is serialized to disk.
+5. In-memory slot cache and UI metadata are updated.
+6. A status/overlay message is shown.
 
-    ROM --> FNV --> Dir
-    Name --> Dir
-```
+Shortcuts bypass the overwrite dialog; manual saves can require confirmation.
 
----
+## Load flow
 
-## Flux de sauvegarde d'un slot
+When loading a slot:
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant App
-    participant Disk
+1. The app checks whether a snapshot exists in memory.
+2. CPU and display state are restored.
+3. Memory is restored when the snapshot payload is valid.
+4. If memory payload is not usable, the ROM can be reloaded as fallback.
+5. Runtime accumulators are reset.
+6. Emulation resumes from the restored state.
 
-    User->>App: save_state_slot_manual(slot)\nou raccourci clavier
+Oxide can also load a `.state` file directly from disk.
 
-    alt Slot déjà occupé (manual)
-        App->>User: Fenêtre de confirmation\n"Écraser le slot N ?"
-        User->>App: Confirme
-    end
+## Automatic slot discovery
 
-    App->>App: save_state_slot_commit(slot, manual)
-    App->>App: savestates[slot] = EmuSnapshot { cpu, display, memory }
-    App->>App: savestate_meta[slot] = SaveStateMeta { name, timestamp }
-    App->>App: persist_savestate(slot)
-    App->>Disk: Supprime ancien fichier du slot
-    App->>Disk: Écrit &lt;nom&gt;_&lt;slot&gt;_&lt;timestamp&gt;.state (JSON)
-    App->>User: Overlay "État sauvegardé dans le slot N"
-```
+When a ROM is loaded, Oxide scans the corresponding save-state directory and attempts to load the latest file for each slot.
 
----
+Validation uses:
 
-## Flux de chargement d'un slot
+- ROM hash
+- slot index
+- matching folder naming conventions
 
-```mermaid
-flowchart TD
-    A([load_state_slot N]) --> B{savestates[N] existe ?}
-    B -- Non --> C["status: Slot vide N\noverlay affiché"]
-    B -- Oui --> D["cpu = snapshot.cpu\ndisplay = snapshot.display"]
-    D --> E{memory.len() correct ?}
-    E -- Oui --> F["cpu.memory.copy_from_slice(&snapshot.memory)"]
-    E -- Non --> G["cpu.load_program(&rom_data) — fallback"]
-    F --> H["rom_chargee = true\nen_pause = false\nreset_runtime_clocks()"]
-    G --> H
-    H --> I([Émulation reprend])
-```
+This repopulates in-memory slot metadata for menus and overlays.
 
----
+## Save-state compatibility notes
 
-## Chargement auto des saves au démarrage d'une ROM
+Each `.state` carries a `version` field.
 
-```mermaid
-flowchart TD
-    ROM([ROM chargée]) --> DIR["savestate_dir_for_rom()\n→ savestates/&lt;nom&gt;-&lt;hash&gt;/"]
-    DIR --> HASH["rom_hash_hex() calculé"]
+That gives the project room to evolve the format later. At the moment, compatibility is tied to the current internal representation of the CPU/display snapshot types.
 
-    HASH --> SLOT0["latest_savestate_file(dir, 0, nom)"]
-    HASH --> SLOT1["latest_savestate_file(dir, 1, nom)"]
-    HASH --> SLOT2["latest_savestate_file(dir, 2, nom)"]
+## Runtime log persistence
 
-    SLOT0 --> V0{hash + slot\ncorrespondent ?}
-    SLOT1 --> V1{hash + slot\ncorrespondent ?}
-    SLOT2 --> V2{hash + slot\ncorrespondent ?}
+Oxide also persists log sessions separately from save states.
 
-    V0 -- Oui --> L0["savestates[0] = Some(snapshot)\nsavestate_meta[0] = Some(meta)"]
-    V1 -- Oui --> L1["savestates[1] = Some(snapshot)"]
-    V2 -- Oui --> L2["savestates[2] = Some(snapshot)"]
+Folders:
 
-    V0 -- Non --> N0["savestates[0] = None"]
-    V1 -- Non --> N1["savestates[1] = None"]
-    V2 -- Non --> N2["savestates[2] = None"]
-```
+- `logs/app/`
+- `logs/emulator/`
 
----
+Current session log file:
 
-## Parameter persistence (eframe::Storage)
+- `latest.logs`
 
-```mermaid
-flowchart LR
-    subgraph Sauvegardé ["Persisté (eframe storage)"]
-        A["theme, langue, vsync\nvideo_scale, touches\nraccourcis, cycles_par_seconde\nson_active, sound_volume\nquirks, quirks_preset\nterminal_active\nlast_rom_path"]
-    end
+On startup:
 
-    subgraph Réinitialisé ["Réinitialisé au démarrage"]
-        B["cpu, display, keypad\nrom_data, rom_path\nrom_chargee, en_pause\nsavestates, savestate_meta\nterminal_logs, audio_engine\noverlay, focus flags..."]
-    end
+- previous `latest.logs` is compressed into a timestamped `.zip`
+- a fresh `latest.logs` file is opened
 
-    App["Oxide::save()"] --> Sauvegardé
-    App -->|"reset_runtime_on_startup()"| Réinitialisé
-```
+This keeps session logs compact and avoids growing a single unbounded file.
 
----
+## Exporting debug logs
 
-## Logs automatiques (rotation ZIP)
+From the debug terminal, logs can also be exported manually to a user-selected `.txt` or `.log` file.
 
-```mermaid
-flowchart TD
-    Start([Start]) --> Check{latest.logs\nexiste ?}
-    Check -- yes --> Zip["Crée logs-app-&lt;timestamp&gt;.zip\ncontenant latest.logs"]
-    Zip --> Del["Delete latest.logs"]
-    Del --> New["Open new latest.logs"]
-    Check -- Non --> New
-    New --> Session["Writing session logs"]
-```
+This export is independent from the rotating session logs above.
 
-```
-logs/
-├── app/
-│   ├── latest.logs              ← current session
-│   └── logs-app-2025-01-01_...zip
-└── emulator/
-    ├── latest.logs
-    └── logs-emulator-2025-01-01_...zip
-```
+## What is not persisted as settings
+
+Important distinction:
+
+- save states persist emulation state per ROM
+- settings persistence does not keep an active emulation session alive between launches
+
+At startup, runtime state is cleared intentionally even if preferences are restored.

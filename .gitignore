@@ -11,3 +11,8 @@ Thumbs.db
 *.logs
 logs/
 
+
+/Oxide.docx
+/Oxide.pdf
+/Oxide.png
+/PDF.docx

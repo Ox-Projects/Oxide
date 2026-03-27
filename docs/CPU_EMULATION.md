@@ -1,153 +1,149 @@
-# Oxide — CPU & Émulation CHIP-8
+# Oxide - CPU Emulation
 
-Documentation technique du cœur d'émulation CHIP-8 d'Oxide.
+This document focuses on the current CHIP-8 emulation core implemented in `src/cpu.rs`.
 
----
+## CPU state
 
-## Registres du CPU CHIP-8
+The emulator models the standard CHIP-8 machine state:
 
-```mermaid
-classDiagram
-    class CPU {
-        +v : [u8; 16]       %% V0..VF
-        +i : u16            %% Registre index
-        +pc : u16           %% Program Counter
-        +sp : u8            %% Stack Pointer
-        +stack : [u16; 16]  %% Pile d'appels
-        +delay_timer : u8   %% Timer délai (60 Hz)
-        +sound_timer : u8   %% Timer sonore (60 Hz)
-        +memory : [u8; 4096]
-        +new() CPU
-        +hard_reset()
-        +load_program(program) usize
-        +cycle(display, keypad, quirks)
-        +tick_timers()
-    }
+- `V0..VF`: 16 general-purpose 8-bit registers
+- `I`: 16-bit index register
+- `PC`: program counter
+- `SP`: stack pointer
+- `stack[16]`: call stack
+- `delay_timer`: decremented at 60 Hz
+- `sound_timer`: decremented at 60 Hz
+- `memory[4096]`: full CHIP-8 memory space
 
-    class CpuQuirks {
-        +shift_uses_vy : bool
-        +jump_uses_vx : bool
-        +draw_clips : bool
-        +load_store_increment_i : bool
-        +logic_clears_vf : bool
-    }
+## Memory layout
 
-    class Display {
-        +pixels : Vec~u8~    %% 64×32
-        +clear()
-        +get_pixel(x, y) bool
-        +set_pixel(x, y) bool
-    }
+Current layout used by Oxide:
 
-    class Keypad {
-        +keys : [bool; 16]
-        +is_pressed(key) bool
-        +first_pressed() Option~u8~
-        +set_all(keys)
-    }
+- `0x000-0x04F`: reserved
+- `0x050-0x09F`: built-in fontset (glyphs `0-F`)
+- `0x0A0-0x1FF`: reserved / interpreter space
+- `0x200-0xFFF`: loaded ROM program area
 
-    CPU --> CpuQuirks : utilise
-    CPU --> Display : écrit
-    CPU --> Keypad : lit
-```
+ROM loading starts at the standard CHIP-8 start address.
 
----
+## Execution cycle
 
-## Disposition de la mémoire CHIP-8
+The CPU cycle follows the standard pattern:
 
-```mermaid
-block-beta
-    columns 1
-    block:mem["Mémoire (4096 octets)"]
-        A["0x000 – 0x04F\n(réservé)"]
-        B["0x050 – 0x09F\nFontset intégré\n(glyphes 0–F, 5 octets chacun)"]
-        C["0x0A0 – 0x1FF\n(réservé interpréteur)"]
-        D["0x200 – 0xFFF\nProgramme ROM\n(PROGRAM_START)"]
-    end
-```
+1. Fetch 2 bytes at `PC`
+2. Increment `PC`
+3. Decode opcode fields
+4. Execute the corresponding instruction
+5. Mutate CPU, display, keypad, or memory state
 
----
+The main frame loop decides how many CPU cycles run per frame based on `cycles_par_seconde` and accumulated frame time.
 
-## Cycle d'exécution CPU
+## Implemented opcode groups
 
-```mermaid
-flowchart TD
-    A([cycle appelé]) --> B["fetch()\nLit 2 octets à PC\nPC += 2"]
-    B --> C["execute(opcode, ...)"]
-    C --> D{Nibble haut}
+Oxide implements the full CHIP-8 opcode set currently targeted by the project, including:
 
-    D --> |0x0| E["CLS / RET"]
-    D --> |0x1| F["JP addr"]
-    D --> |0x2| G["CALL addr"]
-    D --> |0x3/4/5/9| H["Skip conditionnel"]
-    D --> |0x6| I["LD Vx, nn"]
-    D --> |0x7| J["ADD Vx, nn"]
-    D --> |0x8| K["Ops ALU\n(OR, AND, XOR,\nADD, SUB, SHR, SHL)"]
-    D --> |0xA| L["LD I, addr"]
-    D --> |0xB| M["JP V0+addr / Vx+addr"]
-    D --> |0xC| N["RND Vx, nn"]
-    D --> |0xD| O["DRW Vx, Vy, n\n(XOR sprite, collision)"]
-    D --> |0xE| P["SKP / SKNP\n(touche pressée)"]
-    D --> |0xF| Q["LD/ADD/BCD/STR/LD\n(timers, I, mémoire)"]
-```
+- screen control and return
+- jumps and calls
+- conditional skips
+- register load / immediate add
+- register ALU operations
+- index register operations
+- random masked values
+- sprite drawing
+- keypad-dependent skips
+- timer operations
+- BCD conversion
+- register-memory transfer operations
 
----
+## Display drawing behavior
 
-## Gestion des timers
+Sprites are drawn through XOR semantics on the logical `64x32` framebuffer.
 
-```mermaid
-sequenceDiagram
-    participant App
-    participant CPU
-    participant Audio
+During `DRW`:
 
-    loop À ~60 Hz (timer_accumulator)
-        App->>CPU: tick_timers()
-        CPU->>CPU: delay_timer -= 1 (si > 0)
-        CPU->>CPU: sound_timer -= 1 (si > 0)
-    end
+- bits are read from memory at `I`
+- pixels are XORed into `Display`
+- `VF` is used as the collision flag
 
-    App->>App: buzzer_active = sound_timer > 0\n&& son_active && volume > 0
-    App->>Audio: set_buzzer(buzzer_active, volume)
-```
+Depending on the selected quirk preset, draw behavior can wrap or clip at the display edges.
 
----
+## Timers
 
-## Quirks de compatibilité
+`delay_timer` and `sound_timer` are not tied to raw CPU cycle count.
 
-| Quirk | CHIP-8 | CHIP-48 | SUPER-CHIP | Effet |
-|---|:---:|:---:|:---:|---|
-| `shift_uses_vy` | ❌ | ✅ | ✅ | `8xy6/8xyE` décale VY plutôt que VX |
-| `jump_uses_vx` | ❌ | ✅ | ✅ | `Bxnn` saute à `Vx + nnn` |
-| `draw_clips` | ❌ | ❌ | ✅ | Les sprites sont coupés aux bords |
-| `load_store_increment_i` | ❌ | ❌ | ❌ | `Fx55/Fx65` incrémentent I |
-| `logic_clears_vf` | ❌ | ❌ | ❌ | Ops logiques remettent VF à 0 |
+Instead:
 
-```mermaid
-flowchart LR
-    subgraph Presets
-        P1["CHIP-8\n(défaut)"]
-        P2["CHIP-48"]
-        P3["SUPER-CHIP"]
-        P4["Custom"]
-    end
+- the app accumulates time separately
+- timers are ticked at approximately `60 Hz`
+- `sound_timer > 0` drives the audio buzzer
 
-    P1 -->|"tous quirks\nà false"| Q["CpuQuirks"]
-    P2 -->|"shift_vy + jump_vx"| Q
-    P3 -->|"shift_vy + jump_vx\n+ draw_clips"| Q
-    P4 -->|"configuration\nmanuelle"| Q
-```
+This keeps timers stable even if CPU speed changes.
 
----
+## Compatibility quirks
 
-## Rendu de l'affichage CHIP-8
+Oxide exposes 5 configurable CHIP-8 quirks through `CpuQuirks`:
 
-```mermaid
-flowchart TD
-    FB["Display.pixels\n[u8; 64×32]"]
-    Scale["pixel_size calculé\n(video_scale × 10 px\nou plein écran adaptatif)"]
-    Painter["egui Painter\nrect_filled() × 2048\nblanc si pixel=1\nnoir si pixel=0"]
-    Overlay["Overlay optionnel\n(pause / message statut)"]
+- `shift_uses_vy`
+- `jump_uses_vx`
+- `draw_clips`
+- `load_store_increment_i`
+- `logic_clears_vf`
 
-    FB --> Scale --> Painter --> Overlay
-```
+Available presets:
+
+- `CHIP-8`
+- `CHIP-48`
+- `SUPER-CHIP`
+- `Custom`
+
+Preset mapping is defined in `src/types.rs`.
+
+## Input path
+
+The CPU reads key state from `Keypad`.
+
+`Keypad` itself is populated from a merged input pipeline:
+
+- keyboard
+- mouse button bindings
+- gamepad state
+- debug terminal virtual keypad state
+
+This means the CPU always consumes a single normalized keypad view.
+
+## ROM loading and reset behavior
+
+When a ROM is loaded:
+
+- CPU memory is reset appropriately
+- the ROM is copied into program memory
+- display and runtime accumulators are reset as needed
+- save states associated with the ROM are reloaded from disk if available
+
+A stop/reset action clears active runtime state without wiping persisted user settings.
+
+## Audio coupling
+
+The CPU itself does not own audio playback.
+
+Instead:
+
+- `sound_timer` is decremented in the runtime loop
+- `app.rs` checks whether sound should be active
+- `AudioEngine` starts or stops the buzzer accordingly
+
+## Practical debugging support
+
+The emulator exposes a test-report path for diagnostics.
+
+`emit_test_report()` can log:
+
+- ROM name
+- running/paused state
+- current `PC` and opcode
+- register dump
+- display activity summary
+- keypad state
+- active quirk preset and flags
+
+This is especially useful when validating ROM behavior or quirk regressions.
