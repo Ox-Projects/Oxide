@@ -19,7 +19,7 @@
 ### Platform / Packaging
 - [x] Windows single-instance protection
 - [x] Bundled icons, logo, and fonts
-- [ ] GitHub Actions release automation
+- [x] GitHub Actions release automation
 - [ ] Cross-platform validation on macOS and Linux
 - [ ] ARM validation for non-Windows targets
 

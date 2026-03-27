@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.92.0] - Stable
+
+### Added
+- Animated startup splash screen with logo
+- Version display on the splash screen
+- Kiwano theme
+- Theme selection in Settings
+- Top-bar theme switching between Kiwano / Dark / Light
+- Embedded application assets (icons, logo, fonts)
+- `build.rs` for Windows resource and icon integration
+- Shared `common.json` support for UI translations
+- Shared `common.json` support for debug translations
+- Localized debug translation files
+- Splash lifecycle, launch, and exit debug logs
+- Technical documentation set with Mermaid diagrams
+- GitHub Actions release automation for Windows releases
+
+### Fixed
+- Multiple mojibake / UTF-8 encoding issues
+- Translation and debug localization gaps
+- Several Kiwano theme inconsistencies
+- Menu and top-bar visual inconsistencies
+- Settings reset popup persistence issues
+- Reset button text styling issues
+
+### Changed
+- Improved startup flow and splash behavior
+- Improved splash window handling and transition to the main window
+- Improved Kiwano theme consistency across the UI
+- Improved settings reset flow and theme synchronization
+- Improved runtime logging and debug reporting
+- Improved multilingual translation consistency across 12 languages
+- Refactored application state, theme handling, localization loading, and UI structure
+
+---
+
 ## [0.91.1] - Stable
 
 ### Added

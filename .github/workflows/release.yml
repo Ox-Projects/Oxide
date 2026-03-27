@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag (example: v0.92.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    name: Build Windows Release
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Prepare release bundle
+        shell: pwsh
+        run: |
+          $version = "${{ env.RELEASE_TAG }}"
+          $bundleName = "Oxide-$version-windows-x64"
+          $bundleDir = Join-Path $env:RUNNER_TEMP $bundleName
+
+          New-Item -ItemType Directory -Path $bundleDir -Force | Out-Null
+          Copy-Item "target\release\Oxide.exe" $bundleDir
+
+          if (Test-Path "README.md") {
+            Copy-Item "README.md" $bundleDir
+          }
+
+          if (Test-Path "LICENSE") {
+            Copy-Item "LICENSE" $bundleDir
+          }
+
+          $presetDirs = @(
+            "savestates",
+            "logs",
+            "logs\app",
+            "logs\emulator"
+          )
+
+          foreach ($relativeDir in $presetDirs) {
+            $fullDir = Join-Path $bundleDir $relativeDir
+            New-Item -ItemType Directory -Path $fullDir -Force | Out-Null
+            $keepFile = Join-Path $fullDir ".gitkeep"
+            Set-Content -Path $keepFile -Value "" -Encoding utf8
+          }
+
+          Compress-Archive -Path "$bundleDir\*" -DestinationPath "$bundleDir.zip" -Force
+
+          "BUNDLE_ZIP=$bundleDir.zip" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create or update GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          generate_release_notes: false
+          append_body: false
+          files: |
+            target/release/Oxide.exe
+            ${{ env.BUNDLE_ZIP }}
